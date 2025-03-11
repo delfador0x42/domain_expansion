@@ -4,4 +4,4 @@ Unauthorized or malicious use of this tool against systems you do not own or hav
 
 By using this tool, you agree that the authors are not responsible for any misuse, illegal activity, or consequences resulting from its use. The tool is provided as-is, without any warranty or guarantee of any kind.
 
-![Domain_Expansion](https://github.com/user-attachments/assets/16890687-42fb-4741-8b99-a42f5120f87b)
+![Domain_Expansion](assets/domain_expansion.png)
