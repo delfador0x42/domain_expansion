@@ -1,0 +1,30 @@
+[package]
+name = "test_prog"
+version = "0.1.0"
+edition = "2024"
+
+# Binary for filesystem-checker
+[[bin]]
+name = "filesystem-checker"
+path = "src/filesystem-checker/main.rs"
+
+# Binary for process-validator
+[[bin]]
+name = "process-validator"
+path = "src/process-validator/main.rs"
+
+
+[[bin]]
+name = "network-validator"
+path = "src/network-validator/main.rs"
+
+
+[[bin]]
+name = "library-validator"
+path = "src/library-validator/main.rs"
+
+[dependencies]
+bincode = "1.3"
+clap = { version = "4.5.31", features = ["derive"] }
+serde = { version = "1.0", features = ["derive"] }
+
