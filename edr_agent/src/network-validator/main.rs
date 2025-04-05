@@ -1,142 +1,84 @@
-use std::process::Command;
-use std::io::{self, Write};
-use std::fs::File;
-use std::io::BufReader;
-use std::io::BufRead;
-use std::net::IpAddr;
-use std::str::FromStr;
+/*
+root@wudan:~# ls -l /proc/1074/fd
+total 0
+lr-x------ 1 root root 64 Apr  5 19:55 0 -> /dev/null
+lrwx------ 1 root root 64 Apr  5 20:02 1 -> 'socket:[11514]'
+lrwx------ 1 root root 64 Apr  5 20:02 2 -> 'socket:[11514]'
+lrwx------ 1 root root 64 Apr  5 20:02 3 -> 'socket:[11554]'
+lrwx------ 1 root root 64 Apr  5 20:02 4 -> 'socket:[11524]'
+lrwx------ 1 root root 64 Apr  5 20:02 5 -> 'socket:[11529]'
+lrwx------ 1 root root 64 Apr  5 20:02 6 -> /dev/ptmx
+lrwx------ 1 root root 64 Apr  5 20:02 7 -> 'socket:[11841]'
+l-wx------ 1 root root 64 Apr  5 20:02 9 -> /run/systemd/sessions/2.ref
 
-#[derive(Debug)]
-struct GeoIpEntry {
-    network: String,
-    country: String,
-    region: String,
-    city: String,
-}
+root@wudan:~# cat /proc/net/tcp
+  sl  local_address rem_address   st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 3600007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000   992        0 9694 1 ffff000085da0000 100 0 0 10 5
+   1: 3500007F:0035 00000000:0000 0A 00000000:00000000 00:00000000 00000000   992        0 9692 1 ffff000085da2600 100 0 0 10 5
+   2: 0100007F:9D95 00000000:0000 0A 00000000:00000000 00:00000000 00000000  1000        0 12147 1 ffff000085da5f00 100 0 0 10 0
+   3: 0100007F:9D95 0100007F:CA08 01 00000000:00000000 00:00000000 00000000  1000        0 16917 1 ffff000085da2f80 20 4 0 10 -1
+   4: 879EA8C0:A40A 27BE7DB9:0050 06 00000000:00000000 03:000007A7 00000000     0        0 0 3 ffff0000854acd68
+   5: 0100007F:CA08 0100007F:9D95 01 00000000:00000000 00:00000000 00000000  1000        0 16199 1 ffff000085da5580 20 4 20 10 -1
 
-fn parse_ip_connection(line: &str) -> Option<String> {
-    let parts: Vec<&str> = line.split_whitespace().collect();
-    if parts.len() > 8 {
-        if let Some(connection) = parts.get(8) {
-            if connection.contains("->") {
-                return Some(connection.to_string());
-            }
-        }
-    }
-    None
-}
+root@wudan:~# cat /proc/net/tcp6
+  sl  local_address                         remote_address                        st tx_queue rx_queue tr tm->when retrnsmt   uid  timeout inode
+   0: 00000000000000000000000000000000:0016 00000000000000000000000000000000:0000 0A 00000000:00000000 00:00000000 00000000     0        0 7959 1 ffff000084d9da00 100 0 0 10 0
+   1: 0000000000000000FFFF0000879EA8C0:0016 0000000000000000FFFF0000019EA8C0:C11B 01 00000000:00000000 02:0008EC4C 00000000     0        0 11524 4 ffff00008a133c00 20 4 1 10 20
+   2: 0000000000000000FFFF0000879EA8C0:0016 0000000000000000FFFF0000019EA8C0:C11F 01 00000000:00000000 02:000926BE 00000000     0        0 12486 2 ffff00008a134600 20 4 30 10 99
+root@wudan:~#
 
-fn get_dst_ip(connection: &str) -> Option<String> {
-    let parts: Vec<&str> = connection.split("->").collect();
-    if parts.len() == 2 {
-        let dst = parts[1];
-        let ip_port: Vec<&str> = dst.split(':').collect();
-        if ip_port.len() == 2 {
-            return Some(ip_port[0].to_string());
-        }
-    }
-    None
-}
+*/
 
-fn load_geoip_data(file_path: &str) -> io::Result<Vec<GeoIpEntry>> {
-    let file = File::open(file_path)?;
-    let reader = BufReader::new(file);
-    let mut entries = Vec::new();
 
-    for line in reader.lines() {
-        let line = line?;
-        let parts: Vec<&str> = line.split(',').collect();
-        if parts.len() >= 4 {
-            entries.push(GeoIpEntry {
-                network: parts[0].to_string(),
-                country: parts[1].to_string(),
-                region: parts[2].to_string(),
-                city: parts[3].to_string(),
-            });
-        }
-    }
-    Ok(entries)
-}
 
-fn ip_in_network(ip: &str, network: &str) -> bool {
-    let ip = match IpAddr::from_str(ip) {
-        Ok(ip) => ip,
-        Err(_) => return false,
-    };
+// (1) Read from /proc get the inode number from all fd pointing to sockets =============================
+/*
+root@wudan:~# ls -l /proc/1074/fd
+total 0
+lr-x------ 1 root root 64 Apr  5 19:55 0 -> /dev/null
+lrwx------ 1 root root 64 Apr  5 20:02 1 -> 'socket:[11514]'
+lrwx------ 1 root root 64 Apr  5 20:02 2 -> 'socket:[11514]'
+lrwx------ 1 root root 64 Apr  5 20:02 3 -> 'socket:[11554]'
+lrwx------ 1 root root 64 Apr  5 20:02 4 -> 'socket:[11524]'
+lrwx------ 1 root root 64 Apr  5 20:02 5 -> 'socket:[11529]'
+lrwx------ 1 root root 64 Apr  5 20:02 6 -> /dev/ptmx
+lrwx------ 1 root root 64 Apr  5 20:02 7 -> 'socket:[11841]'
+l-wx------ 1 root root 64 Apr  5 20:02 9 -> /run/systemd/sessions/2.ref
+*/
 
-    let (network_ip, mask) = match network.split_once('/') {
-        Some((ip, mask)) => (ip, mask),
-        None => return false,
-    };
 
-    let network_ip = match IpAddr::from_str(network_ip) {
-        Ok(ip) => ip,
-        Err(_) => return false,
-    };
 
-    let mask = match mask.parse::<u32>() {
-        Ok(m) => m,
-        Err(_) => return false,
-    };
 
-    match (ip, network_ip) {
-        (IpAddr::V4(ip), IpAddr::V4(net)) => {
-            let ip_int = u32::from_be_bytes(ip.octets());
-            let net_int = u32::from_be_bytes(net.octets());
-            let mask_int = !0u32 << (32 - mask);
-            (ip_int & mask_int) == (net_int & mask_int)
-        }
-        (IpAddr::V6(_), IpAddr::V6(_)) => false, // IPv6 not implemented
-        _ => false,
-    }
-}
+// (2) Read from /proc/net/tcp convert the addresses to decimal and match the inodes from the file descriptors to the inode in these outputs
 
-fn find_geo_location(ip: &str, geoip_data: &[GeoIpEntry]) -> Option<String> {
-    for entry in geoip_data {
-        if ip_in_network(ip, &entry.network) {
-            return Some(format!("{}/{}/{}", entry.country, entry.region, entry.city));
-        }
-    }
-    None
-}
+
+
+// (3) read /proc/net/tcp6 If the address starts with 0000000000000000FFFF0000 then it's ipv4
+
+
+use std::fs;
+use std::path::Path;
+use std::io;
+use rayon::prelude::*;
 
 fn main() -> io::Result<()> {
-    // Load GeoIP data (assuming the CSV file is named "geoip.csv")
-    let geoip_data = load_geoip_data("egress-ip-ranges.csv")?;
-
-    // Create the command
-    let output = Command::new("sudo")
-        .arg("lsof")
-        .arg("-i")
-        .arg("-n")
-        .arg("-P")
-        .output()?;
-
-    // Check if the command was successful
-    if output.status.success() {
-        let stdout = String::from_utf8_lossy(&output.stdout);
-        let lines: Vec<&str> = stdout.lines().collect();
-
-        // Print header
-        println!("{:<20} {:<60} {:<30}", "Process", "Connection", "Geo Location");
-
-        // Process each line
-        for line in lines {
-            if let Some(connection) = parse_ip_connection(line) {
-                if let Some(dst_ip) = get_dst_ip(&connection) {
-                    let geo = find_geo_location(&dst_ip, &geoip_data)
-                        .unwrap_or_else(|| "Unknown".to_string());
-                    println!("{:<20} {:<60} {:<30}", 
-                        line.split_whitespace().next().unwrap_or(""),
-                        connection,
-                        geo);
-                }
-            }
-        }
-    } else {
-        let stderr = String::from_utf8_lossy(&output.stderr);
-        eprintln!("Command failed with error:\n{}", stderr);
-    }
+    // Get all entries in /proc
+    let entries = fs::read_dir("/proc")?;
+    
+    // Process entries in parallel for maximum performance
+    let paths: Vec<_> = entries
+        .filter_map(Result::ok)
+        .filter(|entry| {
+            let file_name = entry.file_name();
+            let name = file_name.to_string_lossy();
+            name.chars().all(|c| c.is_ascii_digit())
+        })
+        .collect();
+    
+    paths.par_iter().for_each(|entry| {
+        let fd_path = entry.path().join("fd");
+        println!("{}", fd_path.display());
+    });
 
     Ok(())
 }
