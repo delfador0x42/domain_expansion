@@ -1,0 +1,31 @@
+# Ignore everything by default
+*
+
+!.gitignore
+
+# Add license and readme
+!LICENSE
+!README.md
+
+# Allow assets (image in readme)
+!assets/
+!assets/**
+
+# Allow server_webstie
+!server_website/
+!server_website/**
+
+# Allow edr_agent
+!edr_agent/Cargo.lock
+!edr_agent/Cargo.toml
+
+# Allow edr_agent
+!edr_agent/src
+!edr_agent/src/**
+
+
+# Ignore target directory inside edr_agent
+#edr_agent/target/
+
+
+
